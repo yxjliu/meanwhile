@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>斗地主 · Meanwhile</title>
+  <link rel="stylesheet" href="../shared/site.css">
+  <link rel="stylesheet" href="ddz.css">
+</head>
+<body>
+  <main class="table">
+    <section class="top">
+      <div class="info">
+        <div class="bottom-cards" id="bottom" title="底牌"></div>
+        <dl class="stats">
+          <div><dt>底分</dt><dd id="base">–</dd></div>
+          <div><dt>倍数</dt><dd id="mult">–</dd></div>
+          <div><dt>积分</dt><dd id="total">0</dd></div>
+        </dl>
+        <button class="btn ghost small" id="redeal" type="button">新一局</button>
+      </div>
+      <div class="counter" aria-label="记牌器">
+        <div class="counter-title">记牌器<small>对手手里还剩</small></div>
+        <div class="counter-grid" id="counter"></div>
+      </div>
+    </section>
+
+    <section class="mid">
+      <div class="seat" id="seat2">
+        <div class="avatar">西</div>
+        <div class="who"><b>西西</b><span class="role"></span></div>
+        <div class="left"><i class="mini-back"></i><b class="n">17</b> 张</div>
+      </div>
+      <div class="center">
+        <div class="played" id="played2"></div>
+        <div class="played" id="played1"></div>
+        <div class="played" id="played0"></div>
+        <div class="toast" id="toast" hidden></div>
+      </div>
+      <div class="seat" id="seat1">
+        <div class="avatar">东</div>
+        <div class="who"><b>东东</b><span class="role"></span></div>
+        <div class="left"><i class="mini-back"></i><b class="n">17</b> 张</div>
+      </div>
+    </section>
+
+    <section class="me">
+      <div class="actions">
+        <span class="my-role" id="my-role"></span>
+        <div class="buttons" id="actions"></div>
+        <span class="msg" id="msg" role="status"></span>
+      </div>
+      <div class="hand" id="hand"></div>
+    </section>
+  </main>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal-box">
+      <h2 id="result-title"></h2>
+      <p class="result-detail" id="result-detail"></p>
+      <table class="result-table"><tbody id="result-rows"></tbody></table>
+      <button class="btn primary" id="again" type="button">再来一局</button>
+    </div>
+  </div>
+
+  <script src="../shared/bar.js" data-root="../"></script>
+  <script src="engine.js"></script>
+  <script src="ai.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bridge Brigade · Meanwhile</title>
+  <link rel="stylesheet" href="../shared/site.css">
+  <style>
+    body { overflow: hidden; }
+    .stage { height: calc(100vh - var(--bar-h)); display: grid; place-items: center; }
+    canvas { display: block; border-radius: 12px; background: #0d2a3d; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+  </style>
+</head>
+<body>
+  <div class="stage"><canvas id="game" aria-label="Bridge Brigade game"></canvas></div>
+  <script src="../shared/bar.js" data-root="../"></script>
+  <script src="game.js"></script>
+</body>
+</html>
