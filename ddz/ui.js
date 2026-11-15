@@ -62,7 +62,7 @@
   // ---------- rendering ----------
   function render() {
     const known = st.landlord >= 0;
-    $('bottom').replaceChildren(...st.bottom.map(id => (known ? cardEl(id, 'sm') : backEl('sm'))));
+    $('bottom').replaceChildren(...st.bottom.map(id => (known ? cardEl(id, 'xs') : backEl('xs'))));
     $('base').textContent = st.base || '–';
     $('mult').textContent = known ? '×' + st.mult : '–';
     $('total').textContent = total.score;

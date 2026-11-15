@@ -5,6 +5,7 @@
   const BL = 70, BR = 410, MID = 240; // bridge edges and centre line
   const SQUAD_Y = 670;
   const MAX_N = 999;
+  const BASE_DMG = 1.35;           // damage per soldier per volley, before upgrades
   const BEST_KEY = 'mw.runner.best';
 
   const cvs = document.getElementById('game');
@@ -35,20 +36,21 @@
   let S = null;            // run state
   let mode = 'title';      // title | play | paused | over
   let pauseWhy = '';
+  let ampId = 0;
 
   function newGame() {
     S = {
       t: 0, dist: 0, stage: 1, points: 0, n: 12, x: MID,
       rate: 1, dmg: 1, pierce: 0, speed: 150, fireCd: 0,
-      bullets: [], zombies: [], gates: [], saws: [], fx: [], texts: [], queue: [],
+      bullets: [], zombies: [], gates: [], saws: [], amps: [], fx: [], texts: [], queue: [],
       boss: null, shake: 0, hurt: 0, sawCd: 0, bossCd: 0, banner: 0, got: { rate: 0, dmg: 0, pierce: 0 },
     };
     buildStage();
     mode = 'play';
   }
 
-  const power = () => S.n * S.dmg * S.rate;                 // damage per second if every shot lands
-  const hpScale = () => Math.pow(Math.max(power(), 10) / 10, 0.85);
+  // Enemy health follows squad size only, so damage upgrades and bullet multipliers really pay off.
+  const hpScale = () => Math.pow(Math.max(S.n, 10) / 10, 0.85);
   const squadR = () => 8 + 6.1 * Math.sqrt(Math.min(S.n, 70));
   const score = () => S.points + Math.floor(S.dist / 20);
 
@@ -61,6 +63,7 @@
     add('wave', 400, { n: 5 + s * 2 });
     add('gates', 300);
     add('saw', 260, { n: 1 + (s >= 3 ? 1 : 0) });
+    add('amp', 130);
     add('wave', 440, { n: 9 + s * 2, brutes: 1 + Math.floor(s / 3), runners: s >= 2 ? s : 0 });
     add('gates', 300);
     if (s >= 2) {
@@ -68,6 +71,7 @@
       add('wave', 440, { n: 11 + s * 3, brutes: 1 + Math.floor(s / 2), runners: s + 1 });
       add('gates', 300);
     }
+    add('amp', 170);
     add('boss', 0);
     S.banner = 2.2;
   }
@@ -83,8 +87,11 @@
       for (let i = 0; i < (ev.opt.n || 1); i++) {
         S.saws.push({ x: i % 2 ? BR - 40 : BL + 40, y: -40 - i * 130, r: 24, vx: (i % 2 ? -1 : 1) * rnd(120, 170), rot: 0 });
       }
+    } else if (ev.kind === 'amp') {
+      const w = 150, x0 = rnd(BL + 6, BR - 6 - w);
+      S.amps.push({ id: ++ampId, x0, x1: x0 + w, y: -20, k: Math.random() < 0.2 ? 3 : 2 });
     } else if (ev.kind === 'boss') {
-      const hp = (7 + S.stage) * 1.7 * Math.pow(Math.max(power(), 10), 0.92);
+      const hp = (7 + S.stage) * 1.7 * Math.pow(Math.max(S.n, 10), 0.92);
       S.boss = { x: MID, y: -90, r: 46, hp, maxHp: hp, spawnCd: 3, hit: 0 };
       say(MID, 250, 'BOSS', '#ff6b6b', 1.6, 34);
     }
@@ -171,11 +178,11 @@
 
   function fire(R) {
     const count = clamp(Math.round(Math.sqrt(S.n)), 1, 9);
-    const dmg = (S.n * S.dmg * 0.16) / count;
+    const dmg = (S.n * S.dmg * BASE_DMG * 0.16) / count;
     const spread = Math.min(R * 1.5, 104);
     for (let i = 0; i < count; i++) {
       const off = count === 1 ? 0 : (i / (count - 1) - 0.5) * spread;
-      S.bullets.push({ x: S.x + off + rnd(-2, 2), y: SQUAD_Y - R * 0.6, dmg, share: 1 / count, pierce: S.pierce, seen: null });
+      S.bullets.push({ x: S.x + off + rnd(-2, 2), y: SQUAD_Y - R * 0.6, vx: 0, dmg, share: 1 / count, pierce: S.pierce, seen: null, amp: 0 });
     }
   }
 
@@ -218,6 +225,7 @@
     if (S.fireCd <= 0) { S.fireCd = 0.16 / S.rate; fire(R); }
 
     for (const g of S.gates) g.y += v * dt;
+    for (const a of S.amps) a.y += v * dt;
     for (const z of S.zombies) {
       z.y += (v + z.vy) * dt;
       // Drift far away, then close in fast so nobody simply walks past the squad.
@@ -247,9 +255,23 @@
     }
 
     // bullets
+    const born = [];
     for (const b of S.bullets) {
+      const py = b.y;
       b.y -= 640 * dt;
-      if (b.y < -20) { b.dead = true; continue; }
+      b.x += b.vx * dt;
+      if (b.y < -20 || b.x < BL - 12 || b.x > BR + 12) { b.dead = true; continue; }
+      // a multiplier gate splits every shot that flies through it
+      for (const a of S.amps) {
+        if (b.amp === a.id || py < a.y || b.y > a.y || b.x < a.x0 || b.x > a.x1) continue;
+        b.amp = a.id;
+        a.flash = 0.08;
+        if (S.bullets.length + born.length > 420) { b.dmg *= a.k; continue; }
+        for (let i = 1; i < a.k; i++) {
+          const side = i % 2 ? 1 : -1;
+          born.push({ ...b, x: b.x + side * 5, vx: b.vx + side * 42 * Math.ceil(i / 2), seen: null });
+        }
+      }
       // gates soak up shots and grow
       for (const g of S.gates) {
         if (g.done || b.y > g.y || b.y < g.y - 50) continue;
@@ -281,7 +303,10 @@
       }
     }
 
+    if (born.length) S.bullets.push(...born);
+
     // gates reach the squad
+    for (const a of S.amps) if (a.flash) a.flash = Math.max(0, a.flash - dt);
     for (const g of S.gates) {
       if (g.L.flash) g.L.flash = Math.max(0, g.L.flash - dt);
       if (g.R.flash) g.R.flash = Math.max(0, g.R.flash - dt);
@@ -327,6 +352,7 @@
     S.zombies = S.zombies.filter(z => !z.dead);
     S.gates = S.gates.filter(g => g.y < H + 60 && !(g.done && g.y > SQUAD_Y + 30));
     S.saws = S.saws.filter(s => s.y < H + 60);
+    S.amps = S.amps.filter(a => a.y < H + 60);
     S.fx = S.fx.filter(p => p.life > 0);
     S.texts = S.texts.filter(t => t.life > 0);
   }
@@ -401,6 +427,17 @@
         label(st.text, (x0 + x1) / 2, g.y - 22, st.size, '#fff');
       });
       ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawAmps() {
+    for (const a of S.amps) {
+      ctx.fillStyle = a.flash ? 'rgba(255, 255, 255, 0.5)' : 'rgba(185, 140, 255, 0.34)';
+      ctx.fillRect(a.x0, a.y - 34, a.x1 - a.x0, 34);
+      ctx.strokeStyle = '#b98cff';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(a.x0, a.y - 34, a.x1 - a.x0, 34);
+      label('BULLETS ×' + a.k, (a.x0 + a.x1) / 2, a.y - 16, 16, '#fff');
     }
   }
 
@@ -515,6 +552,7 @@
     drawWorld(dist);
     if (S) {
       drawGates();
+      drawAmps();
       drawSaws();
       for (const z of S.zombies) drawZombie(z);
       drawBoss();
@@ -534,6 +572,7 @@
         ['← →  or  A D  to move. The squad fires by itself.'],
         ['Walk through blue gates, steer clear of red ones.'],
         ['Shoot a number gate to raise it before you reach it.'],
+        ['Fire through a purple gate to multiply your bullets.'],
         ['Dodge the saws. Kill the boss to clear the stage.'],
         [''],
         ['Press Space to start', '#ffb84d', 20, 700],
