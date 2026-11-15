@@ -93,26 +93,45 @@
       const title = document.getElementById('link-title');
       const text = document.getElementById('link-text');
       const btn = document.getElementById('link-btn');
+      const local = '<a href="' + M.localUrl() + '">localhost:4517</a>';
+      const playing = 'Games pause and a banner appears when Claude Code finishes a turn or needs your OK.';
+      let blocked = false;
+
       function show() {
         const online = M.isOnline();
         box.classList.toggle('on', online);
         btn.hidden = !M.hosted;
-        if (M.hosted && !M.linkWanted()) {
-          title.textContent = 'Claude link: off';
-          text.textContent = 'This page is a plain timer for everyone. If you run Claude Code and the Meanwhile bridge on this computer, you can let the page ask it when Claude is done. Your browser will then ask for permission to reach apps on this device; that is this page talking to the bridge, and nothing else.';
-          btn.textContent = 'Turn on the Claude link';
+        if (!M.hosted) {
+          title.textContent = online ? 'Claude link: connected' : 'Claude link: not connected';
+          text.innerHTML = online ? playing : 'The bridge stopped answering. Double-click <code>play.bat</code> in the project folder to start it again.';
           return;
         }
-        btn.textContent = 'Turn off the Claude link';
-        title.textContent = online ? 'Claude link: connected' : 'Claude link: not connected';
-        text.innerHTML = online
-          ? 'Games pause and a banner appears when Claude Code finishes a turn or needs your OK.'
-          : 'Double-click <code>play.bat</code> in the project folder to connect. Until then, use “Remind me” in the top bar as a plain timer.';
+        // The copy on the web: it can only reach Claude through the visitor's own computer.
+        btn.textContent = M.linkWanted() ? 'Turn off the Claude link' : 'Or link this page instead';
+        if (online) {
+          title.textContent = 'Claude link: connected';
+          text.textContent = playing;
+        } else if (!M.linkWanted()) {
+          title.textContent = 'Claude link: off';
+          text.innerHTML = 'Here the top bar is a plain timer. To see what Claude Code is doing, start <code>play.bat</code> on your computer and play the copy it serves at ' + local + '. That copy needs no browser permission.';
+        } else {
+          title.textContent = 'Claude link: not connected';
+          text.innerHTML = blocked
+            ? 'Your browser is blocking this page from reaching your computer. Allow “Local network access” for this site in its site settings (the icon left of the address), or simply play the copy at ' + local + '.'
+            : 'Waiting for the bridge. Check that <code>play.bat</code> is running and that you allowed the browser’s request to reach apps on this device. The copy at ' + local + ' works without that permission.';
+        }
       }
       btn.addEventListener('click', () => { M.setLink(!M.linkWanted()); show(); });
       addEventListener('meanwhile:link', show);
       show();
       setTimeout(show, 1500);
+      if (M.hosted && navigator.permissions) {
+        navigator.permissions.query({ name: 'local-network-access' }).then(p => {
+          blocked = p.state === 'denied';
+          p.onchange = () => { blocked = p.state === 'denied'; show(); };
+          show();
+        }).catch(() => {});
+      }
     })();
   </script>
 </body>

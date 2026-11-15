@@ -14,6 +14,8 @@ const hooksDir = path.join(claudeDir, 'hooks');
 const settingsPath = path.join(claudeDir, 'settings.json');
 const backupPath = path.join(claudeDir, 'settings.json.before-meanwhile');
 const scriptDest = path.join(hooksDir, 'meanwhile-notify.js');
+const configDest = path.join(hooksDir, 'meanwhile.json');       // tells the hook where the bridge lives
+const stampDest = path.join(hooksDir, 'meanwhile.last-start');
 const EVENTS = ['UserPromptSubmit', 'PostToolUse', 'Stop', 'StopFailure', 'Notification', 'SessionEnd'];
 const uninstall = process.argv.includes('--uninstall');
 
@@ -43,14 +45,16 @@ for (const ev of EVENTS) {
 if (Object.keys(hooks).length) settings.hooks = hooks; else delete settings.hooks;
 
 if (uninstall) {
-  if (fs.existsSync(scriptDest)) fs.unlinkSync(scriptDest);
+  for (const f of [scriptDest, configDest, stampDest]) if (fs.existsSync(f)) fs.unlinkSync(f);
 } else {
   fs.mkdirSync(hooksDir, { recursive: true });
   fs.copyFileSync(path.join(__dirname, 'notify.js'), scriptDest);
+  // With this file in place the hook starts the bridge by itself when it is not running.
+  fs.writeFileSync(configDest, JSON.stringify({ server: path.join(__dirname, 'server.js') }, null, 2));
 }
 fs.mkdirSync(claudeDir, { recursive: true });
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 
 console.log(uninstall
   ? `Removed the Meanwhile hooks from ${settingsPath}`
-  : `Installed the Meanwhile hooks in ${settingsPath}\nHook script: ${scriptDest}\nRestart open Claude Code sessions so they pick the hooks up.`);
+  : `Installed the Meanwhile hooks in ${settingsPath}\nHook script: ${scriptDest}\nThe bridge now starts by itself when Claude Code runs. Stop it with stop.bat.\nRestart open Claude Code sessions so they pick the hooks up.`);

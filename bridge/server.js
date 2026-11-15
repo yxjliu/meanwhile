@@ -182,6 +182,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === '/shutdown' && req.method === 'POST') {
+    // Only a local process may stop the bridge; browsers always send an Origin on POST.
+    if (req.headers.origin) { res.writeHead(403).end(); return; }
+    res.writeHead(204).end();
+    setTimeout(() => process.exit(0), 100);
+    return;
+  }
+
   if (pathname === '/events' && req.method === 'GET') {
     cors(req, res);
     res.writeHead(200, {
@@ -224,6 +232,16 @@ function openBrowser() {
 }
 
 const wantOpen = process.argv.includes('--open');
+const wantStop = process.argv.includes('--stop');
+
+function stopRunningBridge() {
+  const req = http.request({ host: HOST, port: PORT, path: '/shutdown', method: 'POST', timeout: 2000 }, res => {
+    res.resume();
+    console.log('Meanwhile bridge stopped. It starts again the next time Claude Code does something.');
+  });
+  req.on('error', () => console.log('The Meanwhile bridge was not running.'));
+  req.end();
+}
 
 server.on('error', err => {
   if (err.code === 'EADDRINUSE') {
@@ -235,7 +253,8 @@ server.on('error', err => {
   throw err;
 });
 
-server.listen(PORT, HOST, () => {
+if (wantStop) stopRunningBridge();
+else server.listen(PORT, HOST, () => {
   console.log(`Meanwhile is running at ${URL_HOME}`);
   console.log('Leave this window open while you play. Close it to stop.');
   if (wantOpen) openBrowser();

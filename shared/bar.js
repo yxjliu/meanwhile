@@ -161,6 +161,12 @@
     es.addEventListener('attention', e => attention(JSON.parse(e.data)));
     es.onerror = () => { setOnline(false); sessions = []; paint(); };
   }
+  // This same page in the copy the bridge serves on this computer.
+  function localUrl() {
+    const root = new URL(ROOT, location.href).pathname;
+    const rest = location.pathname.startsWith(root) ? location.pathname.slice(root.length) : '';
+    return `http://localhost:${PORT}/${rest}`;
+  }
   function setLink(want) {
     if (onLocalhost) return;
     linkWanted = !!want;
@@ -182,6 +188,8 @@
     } else if (!online && tab.get('mw.remindAt', 0)) {
       tab.set('mw.remindAt', 0);
       paint();
+    } else if (!online && !onLocalhost) {
+      location.href = localUrl(); // the copy served by the bridge needs no browser permission
     }
   });
   remindBtn.addEventListener('click', () => {
@@ -232,7 +240,7 @@
         text = 'No Claude link';
         title = linkWanted
           ? 'Start play.bat on this computer to connect to Claude Code'
-          : 'Timer only. The Claude link can be switched on from the home page.';
+          : 'Timer only here. Click to open the copy on this computer, which shows Claude Code (start play.bat first).';
       }
     }
     pill.className = 'mw-pill ' + cls;
@@ -245,5 +253,5 @@
   paint();
   setInterval(paint, 500);
 
-  window.Meanwhile = { attention, setLink, isOnline: () => online, linkWanted: () => linkWanted, hosted: !onLocalhost };
+  window.Meanwhile = { attention, setLink, localUrl, isOnline: () => online, linkWanted: () => linkWanted, hosted: !onLocalhost };
 })();
