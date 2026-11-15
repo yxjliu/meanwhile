@@ -9,7 +9,7 @@
 <body>
   <main class="hub">
     <h1>Meanwhile</h1>
-    <p class="lede">Three games for the minutes while Claude is working. The bar on top tells you when to go back.</p>
+    <p class="lede">Four games for the minutes while Claude is working. The bar on top tells you when to go back.</p>
 
     <div class="games">
       <a class="game-card" href="ddz/index.html">
@@ -60,27 +60,59 @@
         <p>Start with almost no power. Beat anything weaker, take its number, and work up to the boss.</p>
         <p class="keys"><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> or <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · <kbd>R</kbd> retry stage</p>
       </a>
+      <a class="game-card" href="marble/index.html">
+        <div class="art" aria-hidden="true">
+          <svg width="220" height="100" viewBox="0 0 220 100">
+            <rect x="40" y="30" width="60" height="12" rx="5" fill="#5aa9ff" opacity="0.7"/><rect x="120" y="30" width="60" height="12" rx="5" fill="#4fd18b" opacity="0.7"/>
+            <g font-family="system-ui, sans-serif" font-weight="800" font-size="10" text-anchor="middle" fill="#fff"><text x="70" y="40">×2</text><text x="150" y="40">×3</text></g>
+            <circle cx="70" cy="14" r="5" fill="#e8eaf6"/>
+            <g fill="#5ad1ff"><circle cx="60" cy="56" r="5"/><circle cx="82" cy="60" r="5"/></g>
+            <g fill="#7dffb4"><circle cx="136" cy="54" r="5"/><circle cx="150" cy="62" r="5"/><circle cx="166" cy="56" r="5"/></g>
+            <g fill="#aeb6d8"><circle cx="50" cy="76" r="3"/><circle cx="95" cy="76" r="3"/><circle cx="140" cy="76" r="3"/><circle cx="185" cy="76" r="3"/></g>
+            <path d="M84 84l6 14h40l6-14" fill="none" stroke="#ffd166" stroke-width="4" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h2>Marble Rain</h2>
+        <p>Pour marbles through multiplier gates, watch them split and bounce, and catch the downpour in your cup.</p>
+        <p class="keys"><kbd>Space</kbd> hold to pour · <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> move the cup</p>
+      </a>
     </div>
 
     <section class="link-box" id="link-box">
       <h3 id="link-title">Claude link: checking…</h3>
       <p id="link-text">Looking for the bridge on this computer.</p>
+      <p><button class="link-btn" id="link-btn" type="button" hidden></button></p>
     </section>
   </main>
 
   <script src="shared/bar.js" data-root="./"></script>
   <script>
     (() => {
+      const M = window.Meanwhile;
       const box = document.getElementById('link-box');
-      const set = online => {
+      const title = document.getElementById('link-title');
+      const text = document.getElementById('link-text');
+      const btn = document.getElementById('link-btn');
+      function show() {
+        const online = M.isOnline();
         box.classList.toggle('on', online);
-        document.getElementById('link-title').textContent = online ? 'Claude link: connected' : 'Claude link: not connected';
-        document.getElementById('link-text').innerHTML = online
+        btn.hidden = !M.hosted;
+        if (M.hosted && !M.linkWanted()) {
+          title.textContent = 'Claude link: off';
+          text.textContent = 'This page is a plain timer for everyone. If you run Claude Code and the Meanwhile bridge on this computer, you can let the page ask it when Claude is done. Your browser will then ask for permission to reach apps on this device; that is this page talking to the bridge, and nothing else.';
+          btn.textContent = 'Turn on the Claude link';
+          return;
+        }
+        btn.textContent = 'Turn off the Claude link';
+        title.textContent = online ? 'Claude link: connected' : 'Claude link: not connected';
+        text.innerHTML = online
           ? 'Games pause and a banner appears when Claude Code finishes a turn or needs your OK.'
           : 'Double-click <code>play.bat</code> in the project folder to connect. Until then, use “Remind me” in the top bar as a plain timer.';
-      };
-      addEventListener('meanwhile:link', e => set(e.detail.online));
-      setTimeout(() => set(window.Meanwhile.isOnline()), 1500);
+      }
+      btn.addEventListener('click', () => { M.setLink(!M.linkWanted()); show(); });
+      addEventListener('meanwhile:link', show);
+      show();
+      setTimeout(show, 1500);
     })();
   </script>
 </body>

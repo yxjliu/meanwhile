@@ -25,6 +25,10 @@ const TYPES = {
   '.woff2': 'font/woff2',
 };
 const PRIVATE_DIRS = new Set(['bridge', 'tests', 'node_modules']);
+// Hosted copies of this site that may read Claude's status from the bridge.
+// Add yours with MEANWHILE_ORIGINS=https://name.github.io (comma separated).
+const SITE_ORIGINS = (process.env.MEANWHILE_ORIGINS || 'https://yxjliu.github.io')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
 /** session id -> { id, project, state: 'working' | 'done' | 'needs', since, workSince, message } */
 const sessions = new Map();
@@ -107,8 +111,7 @@ setInterval(() => {
 
 function allowedOrigin(origin) {
   if (!origin) return null;
-  if (origin === 'null') return origin; // a page opened straight from disk
-  if (/^https:\/\/[a-z0-9-]+\.github\.io$/i.test(origin)) return origin;
+  if (SITE_ORIGINS.includes(origin.toLowerCase())) return origin;
   if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return origin;
   return null;
 }

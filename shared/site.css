@@ -155,3 +155,6 @@ kbd {
 .link-box.on { border-color: var(--good); }
 .link-box.on h3 { color: var(--good); }
 .link-box code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; color: var(--text); }
+.link-btn { margin-top: 12px; height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-weight: 600; }
+.link-btn:hover { border-color: var(--accent); }
+.link-btn[hidden] { display: none; }

@@ -10,6 +10,7 @@
   const onLocalhost = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
   const BRIDGE = onLocalhost ? '' : `http://127.0.0.1:${PORT}`;
   const NAG_EVERY = 180; // seconds between repeat alerts while Claude is still waiting
+  const LINK_KEY = 'mw.link';
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -135,15 +136,21 @@
   });
 
   // ---------- bridge link ----------
-  let online = false, sessions = [], skew = 0;
+  // On localhost the page and the bridge are the same server, so it always connects.
+  // The hosted copy would have to reach into the visitor's own computer, which makes
+  // the browser ask for permission. So there it stays off until someone turns it on.
+  let online = false, sessions = [], skew = 0, source = null;
+  let linkWanted = onLocalhost || store.get(LINK_KEY, false) === true;
   function setOnline(v) {
     if (online === v) return;
     online = v;
     dispatchEvent(new CustomEvent('meanwhile:link', { detail: { online } }));
   }
   function connect() {
+    if (!linkWanted || source) return;
     let es;
     try { es = new EventSource(BRIDGE + '/events'); } catch { return; }
+    source = es;
     es.addEventListener('state', e => {
       const d = JSON.parse(e.data);
       skew = Date.now() - d.now;
@@ -153,6 +160,18 @@
     });
     es.addEventListener('attention', e => attention(JSON.parse(e.data)));
     es.onerror = () => { setOnline(false); sessions = []; paint(); };
+  }
+  function setLink(want) {
+    if (onLocalhost) return;
+    linkWanted = !!want;
+    store.set(LINK_KEY, linkWanted);
+    if (linkWanted) connect();
+    else {
+      if (source) { source.close(); source = null; }
+      sessions = [];
+      setOnline(false);
+    }
+    paint();
   }
 
   pill.addEventListener('click', () => {
@@ -211,7 +230,9 @@
       } else {
         manual.hidden = false;
         text = 'No Claude link';
-        title = 'Start play.bat on this computer to connect to Claude Code';
+        title = linkWanted
+          ? 'Start play.bat on this computer to connect to Claude Code'
+          : 'Timer only. The Claude link can be switched on from the home page.';
       }
     }
     pill.className = 'mw-pill ' + cls;
@@ -224,5 +245,5 @@
   paint();
   setInterval(paint, 500);
 
-  window.Meanwhile = { attention, isOnline: () => online };
+  window.Meanwhile = { attention, setLink, isOnline: () => online, linkWanted: () => linkWanted, hosted: !onLocalhost };
 })();

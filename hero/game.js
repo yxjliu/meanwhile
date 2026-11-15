@@ -18,7 +18,7 @@
   let mode = 'title';       // title | play | clear | over
   let stuck = false, bonusHeart = false;
   let fx = [], texts = [];
-  let shake = 0, flash = 0, clearT = 0;
+  let shake = 0, flash = 0, clearT = 0, spot = 0;
   const shown = new Map();  // smooth on-screen positions, keyed by thing id ('hero' for the hero)
 
   // ---------- run flow ----------
@@ -35,6 +35,7 @@
   }
   function enter() {
     mode = 'play';
+    spot = 1.6;
     stuck = HeroCore.isStuck(run.st);
     shown.clear();
     fx = []; texts = [];
@@ -174,7 +175,7 @@
   }
 
   function drawHero(cx, cy, T) {
-    const r = T * 0.27, y = cy + T * 0.08;
+    const r = T * 0.27, y = cy + T * 0.04;
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = '#102a4a';
     ctx.fillStyle = '#e8eaf6';                       // sword
@@ -182,6 +183,9 @@
     ctx.fillRect(-r * 0.09, -r * 1.2, r * 0.18, r * 1.3); ctx.strokeRect(-r * 0.09, -r * 1.2, r * 0.18, r * 1.3);
     ctx.fillStyle = '#ffb84d'; ctx.fillRect(-r * 0.3, r * 0.05, r * 0.6, r * 0.14);
     ctx.restore();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6;      // white rim so the hero pops off the floor
+    ctx.beginPath(); ctx.arc(cx, y, r, 0, 7); ctx.stroke();
+    ctx.strokeStyle = '#102a4a'; ctx.lineWidth = 2.5;
     ctx.fillStyle = flash > 0 ? '#ff9c9c' : '#5aa9ff';
     ctx.beginPath(); ctx.arc(cx, y, r, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#2b6cb8';                       // helmet
@@ -260,16 +264,34 @@
     }
     ctx.setLineDash([]);
 
+    // Your tile glows gold, so you can always find yourself at a glance.
+    const hp = glide('hero', st.x, st.y, dt);
+    const [hx, hy] = centre(g, hp.x, hp.y);
+    if (st.hearts > 0) {
+      const pulse = 0.5 + 0.5 * Math.sin(time * 5);
+      ctx.fillStyle = `rgba(255, 209, 102, ${0.2 + pulse * 0.12})`;
+      roundRect(hx - T / 2 + 2, hy - T / 2 + 2, T - 4, T - 4, 9); ctx.fill();
+      ctx.strokeStyle = `rgba(255, 209, 102, ${0.75 + pulse * 0.25})`;
+      ctx.lineWidth = 4; ctx.stroke();
+      if (spot > 0) {               // rings close in on the hero when a stage starts
+        for (const lag of [0, 0.35]) {
+          const k = Math.max(0, Math.min(1, (spot - lag) / 1.25));
+          if (k <= 0) continue;
+          ctx.strokeStyle = `rgba(255, 209, 102, ${1 - k})`;
+          ctx.lineWidth = 5;
+          ctx.beginPath(); ctx.arc(hx, hy, T * (0.55 + k * 2.6), 0, 7); ctx.stroke();
+        }
+      }
+    }
     for (const t of st.things) {
       const p = glide(t.id, t.x, t.y, dt);
       const [cx, cy] = centre(g, p.x, p.y);
       drawThing(t, cx, cy, T, time);
     }
-    const hp = glide('hero', st.x, st.y, dt);
-    const [hx, hy] = centre(g, hp.x, hp.y);
     if (st.hearts > 0) {
       drawHero(hx, hy, T);
-      pill(fmt(st.power), hx, hy - T * 0.33, Math.max(14, T * 0.23), '#5aa9ff', '#08182b');
+      pill(fmt(st.power), hx, hy - T * 0.35, Math.max(15, T * 0.25), '#ffffff', '#0b3d7a');
+      pill('YOU', hx, hy + T * 0.4, Math.max(10, T * 0.14), '#ffd166', '#241a05');
     }
     for (const p of fx) { ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 3)); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); }
     for (const t of texts) { ctx.globalAlpha = Math.max(0, Math.min(1, (t.life / t.max) * 2)); label(t.text, t.x, t.y, t.size, t.color, 'center', 800); }
@@ -309,6 +331,7 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     shake = Math.max(0, shake - dt * 36);
+    spot = Math.max(0, spot - dt);
     flash = Math.max(0, flash - dt);
     for (const p of fx) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
     for (const t of texts) { t.y -= 38 * dt; t.life -= dt; }
@@ -323,6 +346,7 @@
       overlay('TINY HERO', [
         ['You start weak. Walk into an enemy to fight it.'],
         ['You only win against a smaller number, and then it becomes yours.'],
+        ['You are the blue knight on the glowing gold tile.'],
         ['Green number: you win.   Red number: it costs you a heart.'],
         ['Potions add power, the star doubles it, spikes take some away.'],
         ['Beat every enemy to clear the stage.'],
