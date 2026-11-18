@@ -36,6 +36,14 @@ const clients = new Set();
 
 const snapshot = () => ({ now: Date.now(), sessions: [...sessions.values()] });
 
+// Claude Code tells its hooks which app it is running in.
+const APPS = [[/vscode/i, 'VS Code'], [/cursor/i, 'Cursor'], [/jetbrains|intellij|pycharm/i, 'JetBrains'], [/desktop/i, 'Claude app'], [/^cli$/i, 'Terminal']];
+function appName(entry) {
+  if (!entry) return '';
+  const hit = APPS.find(([re]) => re.test(entry));
+  return hit ? hit[1] : entry.slice(0, 24);
+}
+
 function emit(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) res.write(msg);
@@ -48,10 +56,12 @@ function onHook(h) {
   let s = sessions.get(id);
   const ensure = () => {
     if (!s) {
-      s = { id, project, state: 'working', since: now, workSince: now, message: '' };
+      s = { id, project, app: 'Claude Code', state: 'working', since: now, workSince: now, message: '' };
       sessions.set(id, s);
     }
     if (project) s.project = project;
+    const app = appName(String(h.entry || ''));
+    if (app) s.app = app;
   };
   let attention = null;
 
@@ -75,7 +85,7 @@ function onHook(h) {
       ensure();
       s.state = 'done';
       s.since = now;
-      attention = { kind: 'done', project: s.project };
+      attention = { kind: 'done', project: s.project, app: s.app };
       break;
     case 'Notification': {
       const type = String(h.notification_type || '');
@@ -86,7 +96,7 @@ function onHook(h) {
       s.state = 'needs';
       s.since = now;
       s.message = message;
-      attention = { kind: 'needs', project: s.project, message };
+      attention = { kind: 'needs', project: s.project, app: s.app, message };
       break;
     }
     case 'SessionEnd':
@@ -161,7 +171,7 @@ function serveStatic(req, res, pathname) {
 }
 
 const server = http.createServer((req, res) => {
-  const { pathname } = new URL(req.url, URL_HOME);
+  const { pathname, searchParams } = new URL(req.url, URL_HOME);
 
   if (req.method === 'OPTIONS') {
     if (cors(req, res)) {
@@ -213,9 +223,10 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === '/ack' && req.method === 'POST') {
-    // "I've seen it": clear finished sessions so the waiting clock stops.
+    // "I've seen it": clear finished sessions (one, or all of them) so the waiting clock stops.
     if (req.headers.origin && !cors(req, res)) { res.writeHead(403).end(); return; }
-    for (const [id, s] of sessions) if (s.state !== 'working') sessions.delete(id);
+    const only = searchParams.get('id');
+    for (const [id, s] of sessions) if (s.state !== 'working' && (!only || id === only)) sessions.delete(id);
     emit('state', snapshot());
     res.writeHead(204).end();
     return;

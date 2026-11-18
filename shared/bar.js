@@ -40,6 +40,7 @@
     </div>
     <div class="mw-claude">
       <button class="mw-pill off" id="mw-pill" type="button"><i class="mw-dot"></i><span id="mw-status">Looking for Claude…</span><b id="mw-clock"></b></button>
+      <div class="mw-panel" id="mw-panel" hidden></div>
       <span class="mw-manual" id="mw-manual" hidden>
         <select id="mw-mins" aria-label="Reminder minutes">
           <option value="3">3 min</option><option value="5" selected>5 min</option><option value="10">10 min</option>
@@ -115,7 +116,7 @@
   // ---------- alert ----------
   let lastAlert = Date.now();
   function attention(detail) {
-    const where = detail.project ? ` in ${detail.project}` : '';
+    const where = (detail.project ? ` in ${detail.project}` : '') + (detail.app ? ` (${detail.app})` : '');
     const text = {
       done: `Claude finished${where}. Go take a look.`,
       needs: `Claude needs you${where}${detail.message ? ': ' + detail.message : '.'}`,
@@ -156,6 +157,9 @@
       skew = Date.now() - d.now;
       sessions = d.sessions || [];
       setOnline(true);
+      // Once nothing is waiting on you any more (you replied, or marked it seen), drop the alert.
+      if (!sessions.some(s => s.state !== 'working') && !banner.hidden) { banner.hidden = true; stopFlash(); }
+      renderPanel();
       paint();
     });
     es.addEventListener('attention', e => attention(JSON.parse(e.data)));
@@ -180,11 +184,81 @@
     paint();
   }
 
+  // ---------- session list under the pill ----------
+  // Every Claude Code session on this computer: VS Code, the Claude app, terminals.
+  const panel = $('mw-panel');
+  const node = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const ORDER = { needs: 0, done: 1, working: 2 };
+  function rowWhen(s, now) {
+    if (s.state === 'working') return 'working · ' + fmt((now - skew - (s.workSince || s.since)) / 1000);
+    return (s.state === 'needs' ? 'needs you · ' : 'done · waiting ') + fmt((now - skew - s.since) / 1000);
+  }
+  function renderPanel() {
+    if (panel.hidden) return;
+    const now = Date.now();
+    const list = sessions.slice().sort((a, b) => ORDER[a.state] - ORDER[b.state] || a.since - b.since);
+    const head = node('div', 'mw-panel-head');
+    head.append(node('span', '', 'Claude on this computer'));
+    if (list.some(s => s.state !== 'working')) {
+      const all = node('button', '', 'Mark all seen');
+      all.type = 'button';
+      all.dataset.ack = '';
+      head.append(all);
+    }
+    const kids = [head];
+    if (!list.length) kids.push(node('div', 'mw-empty', 'No sessions right now. Each one shows up here as soon as Claude starts working on it.'));
+    for (const s of list) {
+      const row = node('div', 'mw-row ' + (s.state === 'working' ? 'work' : s.state));
+      row.append(node('i', 'mw-dot'), node('span', 'mw-app', s.app || 'Claude Code'), node('span', 'mw-proj', s.project || 'session'));
+      const when = node('span', 'mw-when', rowWhen(s, now));
+      when.dataset.id = s.id;
+      row.append(when);
+      if (s.state === 'working') row.append(node('span'));
+      else {
+        const seen = node('button', '', 'Seen');
+        seen.type = 'button';
+        seen.dataset.ack = s.id;
+        seen.title = 'Stop the waiting clock for this session';
+        row.append(seen);
+      }
+      if (s.message) row.append(node('span', 'mw-msg', s.message));
+      kids.push(row);
+    }
+    kids.push(node('div', 'mw-foot', 'Covers every Claude Code session running on this computer. Cloud sessions on claude.ai run elsewhere and do not show up.'));
+    panel.replaceChildren(...kids);
+  }
+  function tickPanel() {
+    if (panel.hidden) return;
+    const now = Date.now();
+    for (const when of panel.querySelectorAll('.mw-when')) {
+      const s = sessions.find(x => x.id === when.dataset.id);
+      if (s) when.textContent = rowWhen(s, now);
+    }
+  }
+  function openPanel(open) {
+    panel.hidden = !open;
+    pill.setAttribute('aria-expanded', String(open));
+    renderPanel();
+  }
+  panel.addEventListener('click', e => {
+    const b = e.target.closest('button[data-ack]');
+    if (!b) return;
+    b.blur();
+    const id = b.dataset.ack;
+    fetch(BRIDGE + '/ack' + (id ? '?id=' + encodeURIComponent(id) : ''), { method: 'POST' }).catch(() => {});
+  });
+  addEventListener('pointerdown', e => { if (!panel.hidden && !e.target.closest('.mw-claude')) openPanel(false); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) openPanel(false); });
+
   pill.addEventListener('click', () => {
-    if (online && sessions.some(s => s.state !== 'working')) {
-      fetch(BRIDGE + '/ack', { method: 'POST' }).catch(() => {});
-      banner.hidden = true;
-      stopFlash();
+    pill.blur(); // keep Space and Enter for the game
+    if (online) {
+      openPanel(panel.hidden);
     } else if (!online && tab.get('mw.remindAt', 0)) {
       tab.set('mw.remindAt', 0);
       paint();
@@ -212,13 +286,14 @@
         cls = 'wait';
         text = waiting.some(s => s.state === 'needs') ? 'Claude needs you' : 'Claude is done, waiting on you';
         clock = fmt(secs);
-        title = 'Click once you have looked, to stop this clock';
+        title = 'Click to see each session';
         if (banner.hidden && now - lastAlert > NAG_EVERY * 1000) attention({ kind: 'nag', waited: fmt(secs) });
       } else if (working.length) {
         const since = Math.min(...working.map(s => s.workSince || s.since));
         cls = 'work';
         text = 'Claude working' + (working.length > 1 ? ` ×${working.length}` : working[0].project ? ` · ${working[0].project}` : '');
         clock = fmt((now - skew - since) / 1000);
+        title = 'Click to see each session';
       } else {
         cls = 'idle';
         text = 'Claude idle';
@@ -245,8 +320,11 @@
     }
     pill.className = 'mw-pill ' + cls;
     pill.title = title;
+    pill.dataset.menu = online ? '1' : '';
     statusEl.textContent = text;
     clockEl.textContent = clock;
+    if (!online && !panel.hidden) openPanel(false);
+    tickPanel();
   }
 
   connect();

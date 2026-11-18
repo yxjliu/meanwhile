@@ -60,6 +60,7 @@ process.stdin.on('end', () => {
     session_id: h.session_id,
     cwd: h.cwd,
     notification_type: h.notification_type,
+    entry: process.env.CLAUDE_CODE_ENTRYPOINT, // which app runs this session: VS Code, Claude app, terminal…
     message: h.hook_event_name === 'Notification' ? h.message : undefined,
   });
   send(body, err => {

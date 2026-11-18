@@ -31,7 +31,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .mw-bar {
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 65; /* above the alert banner, so an open session list is never covered */
   height: var(--bar-h);
   display: flex;
   align-items: center;
@@ -159,3 +159,43 @@ kbd {
 .link-btn:hover { border-color: var(--accent); }
 .link-btn[hidden] { display: none; }
 .link-box a { color: var(--accent); font-weight: 600; }
+
+/* ---------- per-session list under the Claude pill ---------- */
+.mw-claude { position: relative; }
+.mw-pill[data-menu="1"]::after { content: "▾"; margin-left: -2px; color: var(--muted); font-size: 11px; }
+.mw-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 70;
+  width: min(440px, calc(100vw - 24px));
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  white-space: normal;
+}
+.mw-panel[hidden] { display: none; }
+.mw-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; font-size: 13px; font-weight: 700; }
+.mw-row {
+  display: grid;
+  grid-template-columns: 8px auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 13px;
+}
+.mw-row + .mw-row { margin-top: 6px; }
+.mw-row.work .mw-dot { background: var(--good); animation: mw-pulse 1.4s ease-in-out infinite; }
+.mw-row.done .mw-dot, .mw-row.needs .mw-dot { background: var(--accent); }
+.mw-app { padding: 1px 7px; border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.mw-proj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.mw-when { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mw-row.done .mw-when, .mw-row.needs .mw-when { color: #ffe0ad; }
+.mw-msg { grid-column: 2 / -1; color: #ffe0ad; font-size: 12px; }
+.mw-panel button { height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 12px; font-weight: 600; }
+.mw-panel button:hover { border-color: var(--accent); }
+.mw-empty, .mw-foot { padding: 8px 4px 2px; color: var(--muted); font-size: 12px; }
